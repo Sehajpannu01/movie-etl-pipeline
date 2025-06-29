@@ -103,7 +103,7 @@ def load(df):
     print("Data loaded to database.")
 
 if __name__ == "__main__":
-    movies = extract(num_pages=5)
+    movies = extract(num_pages=500)
     if movies:
         df = transform(movies)
         load(df)
