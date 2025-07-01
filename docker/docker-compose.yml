@@ -1,16 +1,19 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:13
     environment:
-      POSTGRES_USER: movie_user
-      POSTGRES_PASSWORD: movie_pass
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
       POSTGRES_DB: movie_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   airflow:
     image: apache/airflow:2.7.2
@@ -18,9 +21,20 @@ services:
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://movie_user:movie_pass@postgres/movie_db
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:root@postgres/movie_db
+      # Environment variables for ETL script
+      TMDB_API_KEY: "2f989f1d25d07797d5b10651532cd323"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: movie_db
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      # Superuser credentials for database setup
+      POSTGRES_SUPERUSER: postgres
+      POSTGRES_SUPERUSER_PASSWORD: root
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
     volumes:
@@ -29,9 +43,10 @@ services:
       - ../scripts:/opt/airflow/scripts
     command: >
       bash -c "
-        airflow db init &&
-        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
-        airflow scheduler & airflow webserver
+      airflow db init &&
+      airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
+      airflow webserver --port 8080 --daemon &&
+      airflow scheduler
       "
 
 volumes:
