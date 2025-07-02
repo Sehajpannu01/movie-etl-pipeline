@@ -118,13 +118,16 @@ def transform(movies):
     if not movies:
         print("WARNING: No movies to transform! Creating empty DataFrame.")
         # Return empty DataFrame with expected columns
-        return pd.DataFrame(columns=['id', 'title', 'release_date', 'vote_average', 'year'])
+        return pd.DataFrame(columns=['id', 'title', 'release_date', 'vote_average', 'popularity', 'original_language', 'year', 'release_month', 'genres'])
     
     df = pd.DataFrame([{
         'id': movie['id'],
         'title': movie['title'],
         'release_date': movie['release_date'],
-        'vote_average': movie['vote_average']
+        'vote_average': movie['vote_average'],
+        'popularity': movie.get('popularity', 0),
+        'genre_ids': movie.get('genre_ids', []),
+        'original_language': movie.get('original_language', 'unknown')
     } for movie in movies])
     
     # Convert release_date to datetime
@@ -147,6 +150,43 @@ def transform(movies):
     # Create year column from release_date
     print("Creating year column from release_date...")
     df['year'] = df['release_date'].dt.year
+    
+    # Create release_month column from release_date
+    print("Creating release_month column from release_date...")
+    df['release_month'] = df['release_date'].dt.month
+    
+    # Convert genre_ids to actual genre names
+    print("Converting genre_ids to readable genre names...")
+    
+    # TMDB Genre ID to Name mapping
+    genre_mapping = {
+        28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
+        99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
+        27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Science Fiction",
+        10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western"
+    }
+    
+    def convert_genre_ids_to_names(genre_ids):
+        if not genre_ids:
+            return ""
+        genre_names = [genre_mapping.get(genre_id, f"Unknown({genre_id})") for genre_id in genre_ids]
+        return ", ".join(genre_names)
+    
+    df['genres'] = df['genre_ids'].apply(convert_genre_ids_to_names)
+    
+    # Drop the original genre_ids column (keep the converted 'genres' column)
+    df = df.drop('genre_ids', axis=1)
+    
+    # Remove rows where genres is null or empty
+    print("Filtering out movies with null or empty genres...")
+    rows_before_genre_filter = len(df)
+    df = df[(df['genres'].notna()) & (df['genres'] != '')]
+    rows_after_genre_filter = len(df)
+    rows_removed_genre = rows_before_genre_filter - rows_after_genre_filter
+    
+    if rows_removed_genre > 0:
+        print(f"Removed {rows_removed_genre} movies with null/empty genres.")
+    print(f"Final dataset: {rows_after_genre_filter} movies with valid genres.")
     
     print("Data transformed.")
     return df
